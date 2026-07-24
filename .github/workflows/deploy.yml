@@ -1,0 +1,90 @@
+name: Deploy Tech Challenge 1
+
+on:
+  push:
+    branches:
+      - gitops
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  AWS_ACCOUNT_ID: "613136969418"
+  ECR_FRONTEND_REPOSITORY: tech-challenge-frontend
+  ECR_BACKEND_REPOSITORY: tech-challenge-backend
+  ECS_CLUSTER: tech-challenge-cluster
+  ECS_FRONTEND_SERVICE: tech-challenge-frontend-service
+  ECS_BACKEND_SERVICE: tech-challenge-backend-service
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::613136969418:role/GitHubActions-TechChallenge1-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        env:
+          BACKEND_IMAGE: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_BACKEND_REPOSITORY }}:v1
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t "$BACKEND_IMAGE" \
+            ./backend
+          docker push "$BACKEND_IMAGE"
+
+      - name: Build and push frontend image
+        env:
+          FRONTEND_IMAGE: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_FRONTEND_REPOSITORY }}:v2
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t "$FRONTEND_IMAGE" \
+            ./frontend
+          docker push "$FRONTEND_IMAGE"
+
+      - name: Deploy backend service
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_BACKEND_SERVICE" \
+            --force-new-deployment
+
+      - name: Deploy frontend service
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_FRONTEND_SERVICE" \
+            --force-new-deployment
+
+      - name: Wait for ECS services to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services \
+              "$ECS_BACKEND_SERVICE" \
+              "$ECS_FRONTEND_SERVICE"
+
+      - name: Display final service status
+        run: |
+          aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services \
+              "$ECS_BACKEND_SERVICE" \
+              "$ECS_FRONTEND_SERVICE" \
+            --query 'services[].{Service:serviceName,Desired:desiredCount,Running:runningCount,Status:status}' \
+            --output table
