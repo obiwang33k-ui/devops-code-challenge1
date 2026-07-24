@@ -1,1 +1,27 @@
-node_modules/
+# Node.js dependencies
+**/node_modules/
+npm-debug.log*
+
+# Terraform local files
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Terraform files that may contain secrets
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Environment and secret files
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store

@@ -17,7 +17,7 @@ function App() {
       }
     }
     getId()
-  })
+  }, [])
 
   return (
     <div className="App">
