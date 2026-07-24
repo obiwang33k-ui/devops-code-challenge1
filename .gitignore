@@ -25,3 +25,4 @@ override.tf.json
 
 # macOS
 .DS_Store
+github-actions-trust-policy.json
